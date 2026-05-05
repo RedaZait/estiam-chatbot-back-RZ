@@ -34,7 +34,7 @@ public class AppUser {
 
     @Column(nullable = false)
     @NotBlank(groups = {OnCreate.class, OnUpdate.class})
-    @JsonView({AppUserView.class , RecipeView.class})
+    @JsonView({AppUserView.class, RecipeView.class})
     private String pseudo;
 
     private boolean admin = false;

@@ -1,12 +1,12 @@
 package edu.ban7.e3chatbotback.security;
 
 import io.jsonwebtoken.Jwts;
-import jakarta.persistence.Column;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -24,29 +24,57 @@ public class JwtFilter extends OncePerRequestFilter {
     UserDetailsService userDetailsService;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
 
-        String token = request.getHeader("Authorization");
+        return request.getMethod().equals(HttpMethod.OPTIONS.name())
+                || path.equals("/login")
+                || path.equals("/sign-in");
+    }
 
-        //s'il y a bien un token (possible qu'il n'y en ai pas, ex : pour login / sign-in)
-        if(token != null) {
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain
+    ) throws ServletException, IOException {
 
-            String jwt = token.substring(7);
+        String authorizationHeader = request.getHeader("Authorization");
 
-            String email = Jwts.parser()
-                    .setSigningKey("secret")
-                    .parseClaimsJws(jwt)
-                    .getBody()
-                    .getSubject();
+        if (
+                authorizationHeader != null
+                        && authorizationHeader.startsWith("Bearer ")
+                        && SecurityContextHolder.getContext().getAuthentication() == null
+        ) {
+            try {
+                String jwt = authorizationHeader.substring(7);
 
-            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                String email = Jwts.parser()
+                        .setSigningKey("secret")
+                        .parseClaimsJws(jwt)
+                        .getBody()
+                        .getSubject();
 
-            UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken =
-                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-            usernamePasswordAuthenticationToken
-                    .setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-            SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
+                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
+                UsernamePasswordAuthenticationToken authenticationToken =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
+
+                authenticationToken.setDetails(
+                        new WebAuthenticationDetailsSource().buildDetails(request)
+                );
+
+                SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+
+            } catch (Exception e) {
+                SecurityContextHolder.clearContext();
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                return;
+            }
         }
 
         filterChain.doFilter(request, response);

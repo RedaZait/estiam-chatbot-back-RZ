@@ -1,7 +1,6 @@
 package edu.ban7.e3chatbotback.model;
 
 import com.fasterxml.jackson.annotation.JsonView;
-import edu.ban7.e3chatbotback.view.AppUserView;
 import edu.ban7.e3chatbotback.view.RecipeView;
 import jakarta.persistence.*;
 import lombok.Getter;
